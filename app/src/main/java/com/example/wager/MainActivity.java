@@ -51,14 +51,14 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    //    private final String privateKey = "";
+    private final String privateKey = "";
     private final String wagerContractAddress = "0x7F2991f700832B065B8cEE9F3226957f8c04e595";
     private final OkHttpClient client = new OkHttpClient();
     Web3j web3 = Web3j.build(new HttpService("https://ropsten.infura.io/v3/18bdd762e4b84f1c85479b76ae563634"));
     //    Credentials credentials = Credentials.create(privateKey);
     Credentials credentials;
-    //    Wager wagerContract = Wager.load(wagerContractAddress, web3, credentials, BigInteger.valueOf(1_000_000), BigInteger.valueOf(1_000_000));
-    Wager wagerContract;
+    //    WagerContract wagerContract = WagerContract.load(wagerContractAddress, web3, credentials, BigInteger.valueOf(1_000_000), BigInteger.valueOf(1_000_000));
+    WagerContract wagerContract;
 
     File walletPath;
     String fileName = "keystore.json";
@@ -168,16 +168,18 @@ public class MainActivity extends AppCompatActivity {
             if (f.exists() && !f.isDirectory()) {
                 credentials = WalletUtils.loadCredentials("password", walletPath + "/" + fileName);
             } else {
-                String fileName = WalletUtils.generateLightNewWalletFile("password", walletPath);
-                File walletDir = new File(walletPath + "/" + fileName);
-                credentials = WalletUtils.loadCredentials("password", walletDir);
+                String generatedName = WalletUtils.generateLightNewWalletFile("password", walletPath);
+                File generatedFile = new File(walletPath, generatedName);
+                File keystore = new File(walletPath, fileName);
+                generatedFile.renameTo(keystore);
+                credentials = WalletUtils.loadCredentials("password", walletPath + "/" + fileName);
             }
             accountAddress.setText(credentials.getAddress());
             EthGetBalance balanceWei = web3.ethGetBalance(credentials.getAddress(), DefaultBlockParameterName.LATEST).sendAsync().get();
             BigDecimal balanceInEther = Convert.fromWei(balanceWei.getBalance().toString(), Convert.Unit.ETHER);
             mainAccountBalance = balanceWei.getBalance();
-            if (mainAccountBalance.intValue() > 0) {
-                accountBalance.setText("ETH balance: " + balanceInEther.toPlainString().substring(0, 6));
+            if (mainAccountBalance.compareTo(BigInteger.ZERO) > 0) {
+                accountBalance.setText("ETH balance: " + balanceInEther.toPlainString());
             } else {
                 accountBalance.setText("Please top up your balance");
             }
@@ -231,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             TransactionReceipt receipt = null;
             try {
+                wagerContract = WagerContract.load(wagerContractAddress, web3, credentials, BigInteger.valueOf(1_000_000), BigInteger.valueOf(1_000_000));
                 receipt = wagerContract.createWager(credentials.getAddress(), amountToLendInEth, amountToLendInEth).send();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -252,7 +255,12 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         BigDecimal balanceInEther = Convert.fromWei(balanceWei.getBalance().toString(), Convert.Unit.ETHER);
-        accountBalance.setText("ETH balance: " + balanceInEther.toPlainString().substring(0, 6));
+        if (mainAccountBalance.intValue() > 0) {
+            System.out.println(mainAccountBalance.toString());
+            accountBalance.setText("ETH balance: " + balanceInEther.toPlainString());
+        } else {
+            accountBalance.setText("Please top up your balance");
+        }
         System.out.println("Updated balance " + balanceInEther.toPlainString());
     }
 
@@ -271,7 +279,7 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_favorite) {
+        if (id == R.id.bashboard) {
             Intent intent = new Intent(this, Dashboard.class);
             startActivity(intent);
             return true;

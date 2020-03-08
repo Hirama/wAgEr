@@ -5,7 +5,7 @@
     tools:context=".MainActivity">
 
     <item
-        android:id="@+id/action_favorite"
+        android:id="@+id/bashboard"
         android:icon="@drawable/ic_dashboard_24px"
         android:orderInCategory="300"
         android:title="@string/dashboard"

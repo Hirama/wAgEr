@@ -11,7 +11,7 @@
         android:layout_width="361dp"
         android:layout_height="31dp"
         android:clickable="true"
-        android:text="Account #1"
+        android:text="@string/account_1"
         android:textAlignment="center"
         android:textStyle="bold"
         app:layout_constraintBottom_toTopOf="@+id/textViewAccountBalance"
@@ -24,7 +24,7 @@
         android:id="@+id/textViewAccountBalance"
         android:layout_width="355dp"
         android:layout_height="28dp"
-        android:text="Balance: "
+        android:text="@string/balance"
         android:textAlignment="center"
         android:textStyle="bold"
         app:layout_constraintBottom_toTopOf="@+id/textViewRiskLevel"
@@ -37,7 +37,7 @@
         android:id="@+id/textViewRiskLevel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Risk Level"
+        android:text="@string/risk_level"
         app:layout_constraintBottom_toTopOf="@+id/riskBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
@@ -63,7 +63,7 @@
         android:id="@+id/textViewLoanAmount"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Amount to Lend"
+        android:text="@string/amount_to_lend"
         app:layout_constraintBottom_toTopOf="@+id/amountBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
@@ -90,7 +90,7 @@
         android:id="@+id/textViewMLResult"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="ML Results"
+        android:text="@string/ml_results"
         app:layout_constraintBottom_toTopOf="@+id/assetsTable"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
@@ -112,12 +112,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Asset Name" />
+                android:text="@string/asset_name" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Proportion" />
+                android:text="@string/proportion" />
         </TableRow>
     </TableLayout>
 
@@ -126,7 +126,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@android:color/holo_red_light"
-        android:text="WAGER"
+        android:text="@string/wager"
         android:textAlignment="center"
         android:textColor="@color/colorPrimaryDark"
         android:textStyle="bold"
