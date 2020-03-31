@@ -90,8 +90,6 @@ public class Dashboard extends AppCompatActivity {
             progressDialog.setMessage("Waiting for transaction to be mined...");
             progressDialog.setCancelable(false);
             progressDialog.show();
-
-
             isUpdating.set(true);
             try {
                 new Background().execute().get();
@@ -100,13 +98,13 @@ public class Dashboard extends AppCompatActivity {
             }
         });
 
-        Pie pie = AnyChart.pie();
 
+        Pie pie = AnyChart.pie();
         List<DataEntry> data = new ArrayList<>();
-        data.add(new ValueDataEntry("BTC", 30));
-        data.add(new ValueDataEntry("DAI", 20));
-        data.add(new ValueDataEntry("ETH", 30));
-        data.add(new ValueDataEntry("XAU", 20));
+        data.add(new ValueDataEntry("0KB",26 ));
+        data.add(new ValueDataEntry("MKR", 24));
+        data.add(new ValueDataEntry("LINK", 30));
+        data.add(new ValueDataEntry("CRO", 20));
 
         pie.data(data);
 

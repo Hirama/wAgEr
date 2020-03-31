@@ -1,3 +1,13 @@
+/* Copyright (C) 2020 wAgEr: Vijay Lakshminarayanan - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the GPL license.
+ * Feel free to use the code or samples but please mention my name
+ * Donate us a coffee or beer if you find it useful :)
+ *
+ */
+
+
+
 package com.example.wager;
 
 import android.app.ProgressDialog;
@@ -10,21 +20,39 @@ import android.os.Looper;
 import android.os.StrictMode;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.SeekBar;
-import android.widget.TableLayout;
-import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+
+import com.anychart.APIlib;
+import com.anychart.charts.Pie;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
+import com.anychart.AnyChart;
+import com.anychart.AnyChartView;
+import com.anychart.chart.common.dataentry.DataEntry;
+import com.anychart.chart.common.dataentry.ValueDataEntry;
+import com.anychart.charts.Cartesian;
+import com.anychart.core.cartesian.series.Line;
+import com.anychart.data.Mapping;
+import com.anychart.data.Set;
+import com.anychart.enums.Anchor;
+import com.anychart.enums.MarkerType;
+import com.anychart.enums.TooltipPositionMode;
+import com.anychart.graphics.vector.Stroke;
+
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.WalletUtils;
 import org.web3j.protocol.Web3j;
@@ -41,44 +69,64 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.security.Provider;
 import java.security.Security;
+import java.sql.Wrapper;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import kotlin.collections.unsigned.UArraysKt;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+
+
 
 public class MainActivity extends AppCompatActivity {
 
     private final String privateKey = "";
     private final String wagerContractAddress = "0x7F2991f700832B065B8cEE9F3226957f8c04e595";
     private final OkHttpClient client = new OkHttpClient();
-    Web3j web3 = Web3j.build(new HttpService("https://ropsten.infura.io/v3/18bdd762e4b84f1c85479b76ae563634"));
+    Web3j web3 = Web3j.build(new HttpService("https://ropsten.infura.io/v3/5584712aa62f4de1b5063fe58bbf27eb"));
     //    Credentials credentials = Credentials.create(privateKey);
     Credentials credentials;
     //    WagerContract wagerContract = WagerContract.load(wagerContractAddress, web3, credentials, BigInteger.valueOf(1_000_000), BigInteger.valueOf(1_000_000));
     WagerContract wagerContract;
-
     File walletPath;
     String fileName = "keystore.json";
 
     TextView accountAddress;
     TextView accountBalance;
     TextView riskLevelText;
+    TextView frequencyLevelText;
     TextView amountToLendText;
-    TextView mlResult;
     Button createLoan;
     SeekBar riskBar;
     SeekBar amountBar;
+    SeekBar durationBar;
     int amountToLendLevel;
     int riskLevel;
+    int frequencyLevel;
     BigInteger mainAccountBalance;
     BigInteger amountToLendInEth;
     ProgressDialog progressDialog;
+    int historicalLength = 60;
+    int rankTokens = 5;
+    double[] btcPrice = new double[historicalLength];
+    double[] ethPrice = new double[historicalLength];
+    double[] tokenPercent = new double[rankTokens];
+    String[] tokenList = new String[rankTokens];
+    AnyChartView lineChart,pieChartView;
+    Cartesian cartesian1;
+    Pie pieChart;
+    ArrayList<DataEntry> ethSeries = new ArrayList<>();
+    ArrayList<DataEntry> pieData = new ArrayList<>();
+    Map<String, Double> wagerResultTable = new HashMap<>();
 
-    Map<String, Integer> wagerResultTable = new HashMap<>();
-    TableLayout tableView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,31 +142,45 @@ public class MainActivity extends AppCompatActivity {
         accountAddress = findViewById(R.id.textViewAccountAddress);
         accountBalance = findViewById(R.id.textViewAccountBalance);
         riskLevelText = findViewById(R.id.textViewRiskLevel);
+        frequencyLevelText = findViewById(R.id.textViewDuration);
         amountToLendText = findViewById(R.id.textViewLoanAmount);
-        mlResult = findViewById(R.id.textViewMLResult);
-
-        // table
-        tableView = findViewById(R.id.assetsTable);
-        tableView.setStretchAllColumns(true);
 
         // buttons
         createLoan = findViewById(R.id.buttonCreateWager);
 
         // Bars
         riskBar = findViewById(R.id.riskBar);
-        riskLevel = riskBar.getProgress();
+        riskLevel = riskBar.getProgress()*10;
+        if(riskLevel == 0)
+            riskLevel = 10;
         amountBar = findViewById(R.id.amountBar);
-
         amountToLendLevel = amountBar.getProgress() * 10;
+        if(amountToLendLevel == 0)
+            amountToLendLevel = 10;
+        durationBar = findViewById(R.id.durationBar);
+        frequencyLevel = durationBar.getProgress();
+        if(frequencyLevel == 0)
+            frequencyLevel = durationBar.getProgress();
 
-        riskLevelText.setText("Risk Level: " + riskBar.getProgress());
-        amountToLendText.setText("Amount to lend: " + amountBar.getProgress() * 10 + " %");
+        //Views
+        lineChart = findViewById(R.id.lineChart1);
+        APIlib.getInstance().setActiveAnyChartView(lineChart);
+        lineChart.setProgressBar(findViewById(R.id.progress_bar1));
+        cartesian1 = AnyChart.line();
 
-        riskBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        //Initialize progress bars
+
+        riskLevelText.setText("Risk Level: " + riskLevel + "%");
+        amountToLendText.setText("Amount to lend: " + amountToLendLevel + " % Wallet");
+        frequencyLevelText.setText("Loan Duration:" + frequencyLevel* 6 + "days");
+
+        durationBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                riskLevelText.setText("Risk Level: " + progress);
-                riskLevel = progress;
+                if(progress == 0)
+                    progress = 1;
+                frequencyLevelText.setText("Loan Duration: " + progress* 6 +"days");
+                frequencyLevel = progress*6;
             }
 
             @Override
@@ -128,19 +190,76 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                // Get ML Data
+                // Update historical data
+                lineChart.clear();
+                lineChart = findViewById(R.id.lineChart1);
+                APIlib.getInstance().setActiveAnyChartView(lineChart);
+                lineChart.setProgressBar(findViewById(R.id.progress_bar1));
+                ethSeries.clear();
+                for(int i=0;i<frequencyLevel;i++) {
+                    ethSeries.add(new CustomDataEntry(i, ethPrice[i]));
+                }
+                cartesian1.data(ethSeries);
+                lineChart.setChart(cartesian1);
+
                 try {
-                    getML(riskLevel, amountToLendInEth);
+                    wagerResultTable.clear();
+                    getML(riskLevel, frequencyLevel);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+                // Get risk assessment
+                pieChartView.clear();
+                APIlib.getInstance().setActiveAnyChartView(pieChartView);
+                pieData.clear();
+                for (int i =0; i < rankTokens-1; i++)
+                    pieData.add(new PieDataEntry(tokenList[i],tokenPercent[i]));
+                pieChart.data(pieData);
+                pieChartView.setChart(pieChart);
+
+            }
+        });
+
+        riskBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if(progress ==0)
+                    progress=1;
+                riskLevelText.setText("Risk Level: " + progress*10+"%");
+                riskLevel = progress*10;
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                try {
+                    wagerResultTable.clear();
+                    getML(riskLevel, frequencyLevel);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                // Get risk assessment
+                pieChartView.clear();
+                APIlib.getInstance().setActiveAnyChartView(pieChartView);
+                pieData.clear();
+                   for (int i =0; i < rankTokens-1; i++)
+                        pieData.add(new PieDataEntry(tokenList[i],tokenPercent[i]));
+                pieChart.data(pieData);
+                pieChartView.setChart(pieChart);
+
             }
         });
 
         amountBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                amountToLendText.setText("Amount to lend: " + progress * 10 + " %");
+                if(progress == 0)
+                    progress = 1;
+                amountToLendText.setText("Amount to lend: " + progress * 10 + " % Wallet");
                 amountToLendLevel = progress * 10;
 
                 amountToLendInEth = mainAccountBalance.divide(BigInteger.valueOf(100)).multiply(BigInteger.valueOf(amountToLendLevel));
@@ -153,12 +272,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                // Get ML Data
-                try {
-                    getML(riskLevel, amountToLendInEth);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+
+
             }
         });
 
@@ -184,12 +299,19 @@ public class MainActivity extends AppCompatActivity {
                 accountBalance.setText("Please top up your balance");
             }
             amountToLendInEth = mainAccountBalance.divide(BigInteger.valueOf(100)).multiply(BigInteger.valueOf(amountToLendLevel));
-            getML(riskLevel, amountToLendInEth);
-
+            //Get historical data from Amber Data
+         //   btcPrice=getHistoricalData("https://web3api.io/api/v2/market/prices/btc_usd/historical","UAK42f1c35cfd5527c86e5dc9df987af10f","btc_usd");
+            ethPrice=getHistoricalData("https://web3api.io/api/v2/market/prices/eth_usd/historical","UAK42f1c35cfd5527c86e5dc9df987af10f","eth_usd");
+           //draw first graph of bitcoin, eth prices
+            for (int i =0; i< 5; i++) {
+                tokenList[i] = "ETH";
+                tokenPercent[i] = 20;
+            }
+            drawGraph(btcPrice.length,ethPrice);
+            drawPieChart();
         } catch (Exception e) {
             e.printStackTrace();
         }
-
 
         accountAddress.setOnClickListener(v -> {
             ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
@@ -199,7 +321,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         createLoan.setOnClickListener(v -> {
-
             progressDialog = new ProgressDialog(MainActivity.this);
             progressDialog.setTitle("Please wait");
             progressDialog.setMessage("Waiting for transaction status...");
@@ -210,6 +331,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
+
 
     private void setupBouncyCastle() {
         final Provider provider = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
@@ -288,44 +410,148 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    public void getML(int risk, BigInteger wager) throws Exception {
+
+    public void getML(int risk, int duration)throws Exception {
         Request request = new Request.Builder()
-                .url("http://3.20.206.173/wager_function?risk=" + risk + "&wager=" + wager.toString())
+                .url("http://209.97.177.54/wager_function?risk=" + risk + "&duration=" + duration)
                 .build();
         System.out.println(request.url().toString());
 
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
             Gson gson = new Gson();
-            Type assetMapType = new TypeToken<Map<String, Integer>>() {
+            Type assetMapType = new TypeToken<Map<String, Double>>() {
             }.getType();
-            Map<String, Integer> stringIntegerMap = gson.fromJson(response.body().charStream(), assetMapType);
+            Map<String, Double> stringDoubleMap = gson.fromJson(response.body().charStream(), assetMapType);
 
-            for (Map.Entry<String, Integer> entry : stringIntegerMap.entrySet()) {
-                if (!entry.getKey().equals("index")) {
+            for (Map.Entry<String, Double> entry : stringDoubleMap.entrySet()) {
+                if (!entry.getKey().equals("BTC")) {
                     wagerResultTable.put(entry.getKey(), entry.getValue());
                 }
             }
         }
-
-
-        int count = tableView.getChildCount();
-        for (int i = 1; i < count; i++) {
-            View child = tableView.getChildAt(i);
-            if (child instanceof TableRow) ((ViewGroup) child).removeAllViews();
-        }
-        for (Map.Entry<String, Integer> entry : wagerResultTable.entrySet()) {
-            System.out.println(entry.getKey() + "/" + entry.getValue());
-            TableRow tr = new TableRow(this);
-            TextView c1 = new TextView(this);
-            c1.setText(entry.getKey());
-            TextView c2 = new TextView(this);
-            c2.setText(entry.getValue() + " %");
-            tr.addView(c1);
-            tr.addView(c2);
-            tableView.addView(tr);
+        int i=0;
+        for (Map.Entry<String, Double> entry : wagerResultTable.entrySet()) {
+            tokenList[i] = entry.getKey();
+            tokenPercent[i] = entry.getValue();
+            System.out.println(tokenList[i]+ "/" + tokenPercent[i]);
+            i=i+1;
         }
     }
+
+    //Get Historical data from Amberdata
+    //Price chart to show the users how their token is performing over a certain duration
+    public double[] getHistoricalData(String url, String apikey,String currencykey)
+            throws IOException {
+        int i = 0;
+        double[] price = new double[historicalLength];
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .header("x-api-key", apikey)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
+
+            Gson gson = new Gson();
+           Map response1 = gson.fromJson(response.body().string(), Map.class);
+           Map response2 = gson.fromJson(response1.get("payload").toString(),Map.class);
+           JsonArray objectValues  = gson.fromJson(response2.get(currencykey).toString(),JsonArray.class);
+
+            Iterator <JsonElement> iter = objectValues.iterator();
+            //Iterating the contents of the array
+            while(iter.hasNext()) {
+                Map list1 = gson.fromJson(iter.next().toString(),Map.class);
+                if((list1.get("price")!= null)&&(i<historicalLength)) {
+                    price[i] = (double) list1.get("price");
+                    i++;
+                }
+            }
+            }
+        return price;
+        }
+
+
+    public void drawGraph(int points, double[] eth){
+        //This will give an overview of how the crypto-currency tokens are doing before user "wagers" some cash
+        //Code not refactored, possible improvements in using Linechart with multiple axes
+        //Scaling across different current currency ranges needs to be considered
+        lineChart = findViewById(R.id.lineChart1);
+        APIlib.getInstance().setActiveAnyChartView(lineChart);
+        lineChart.setProgressBar(findViewById(R.id.progress_bar1));
+        ethSeries.clear();
+        for(int i=0;i<points;i++) {
+            ethSeries.add(new CustomDataEntry(i, eth[i]));
+        }
+        Line series1 = cartesian1.line(ethSeries);
+        cartesian1.data(ethSeries);
+        cartesian1.animation(true);
+        cartesian1.padding(2d, 5d, 1d, 5d);
+        cartesian1.crosshair().enabled(true);
+        cartesian1.crosshair()
+                .yLabel(true)
+                .yStroke((Stroke) null, null, null, (String) null, (String) null);
+        cartesian1.tooltip().positionMode(TooltipPositionMode.POINT);
+        cartesian1.yAxis(0).title("USD Price");
+        cartesian1.xAxis(0).title("Days");
+        cartesian1.xAxis(0).labels().padding(1d, 1d, 1d, 1d);
+
+        series1.hovered().markers().enabled(true);
+        series1.hovered().markers()
+                .type(MarkerType.CIRCLE)
+                .size(4d);
+        series1.tooltip()
+                .position("right")
+                .anchor(Anchor.LEFT_CENTER)
+                .offsetX(5d)
+                .offsetY(5d);
+        cartesian1.title("ETH Price history");
+        cartesian1.title().fontSize(11d);
+        cartesian1.title().padding(0d, 0d, 2d, 0d);
+        lineChart.setChart(cartesian1);
+    }
+
+    public void drawPieChart(){
+        //This will give an overview of the token basket chosen for the various risk profiles
+        pieChartView = findViewById(R.id.pieChart1);
+        APIlib.getInstance().setActiveAnyChartView(pieChartView);
+        pieChart = AnyChart.pie();
+          for (int i =0; i < rankTokens; i++)
+              pieData.add(new PieDataEntry(tokenList[i],tokenPercent[i]));
+
+        pieChart.title("Token basket");
+        pieChart.title().fontColor("BLUE");
+        pieChart.title().fontSize(11d);
+        pieChart.hovered().markers().enabled(true);
+        pieChart.hovered().markers()
+                .type(MarkerType.CIRCLE)
+                .size(4d);
+        pieChart.tooltip()
+                .position("right")
+                .anchor(Anchor.LEFT_CENTER)
+                .offsetX(5d)
+                .offsetY(5d);
+        pieChart.animation(true);
+        pieChart.data(pieData);
+        pieChartView.setChart(pieChart);
+    }
+    //Data entry method for the line chart
+    public class CustomDataEntry extends ValueDataEntry {
+        CustomDataEntry(Integer x, Double value) {
+            super(x,value);
+            setValue("x", x);
+            setValue("value", value);
+        }
+    }
+
+    //Data entry method for the pie chart
+    public class PieDataEntry extends ValueDataEntry {
+        PieDataEntry(String token,double x) {
+            super(token, x);
+            setValue("token",token);
+        }
+    }
+
 
     class Background extends AsyncTask<Void, Void, Void> {
         @Override

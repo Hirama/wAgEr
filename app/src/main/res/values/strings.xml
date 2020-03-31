@@ -9,6 +9,7 @@
     <string name="asset_name">Asset Name</string>
     <string name="ml_results">ML Results</string>
     <string name="amount_to_lend">Amount to Lend</string>
+    <string name="loan_duration">Loan duration</string>
     <string name="risk_level">Risk Level</string>
     <string name="balance">Balance:</string>
     <string name="account_1">Account #1</string>
